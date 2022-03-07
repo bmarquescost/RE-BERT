@@ -178,6 +178,7 @@ def main():
     model_classes = {
         'RE_BERT': RE_BERT,
     }
+    
     opt.model_class = model_classes[opt.model_name]
     opt.inputs_cols = input_colses[opt.model_name]
     opt.initializer = initializers[opt.initializer]
@@ -203,26 +204,41 @@ def main():
       predict_data.append([sent,requirements_candidates,results])
     
     
-    features_extracted=list()
+    confidences = []
+    features_extracted = []
+    
     for predict in predict_data:
+        featu= []
+        confu= []
+        
         iobAnt=-1
-        featu=list()
+        prev_score = 0
+
         for p in predict[2]:
           #o,b,i=p[1]['confidences']
           token=p[0]
           iob=p[1]['iob']
+          confidence = p[1]['confidences'][np.argmax(p[1]['confidences'])]
+
 
           if iob!=-1 and iobAnt==-1:
             featu.append(token)
+            confu.append(confidence)
+
           elif iob!=-1 and iobAnt!=-1:
             #print(len(featu)-1, featu)
             featu[len(featu)-1]= featu[len(featu)-1] +' '+token
+            confu[len(confu)-1] = confu[len(confu)-1] * prev_score
+
           iobAnt=iob
+          prev_score = confidence
+
         features_extracted.append((';'.join(featu)))
+        confidences.append(';'.join([str(i) for i in confu]))
 
     f = open(opt.output_file, "w")
-    for item in features_extracted:
-      f.write(item+"\n")
+    for feature, confidence in zip(features_extracted, confidences):
+      f.write(f"{feature},{confidence}'\n'")
     f.close()
     
     print('Extracted software requirements --> '+opt.output_file)
