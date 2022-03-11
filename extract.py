@@ -238,7 +238,7 @@ def main():
 
     f = open(opt.output_file, "w")
     for feature, confidence in zip(features_extracted, confidences):
-      f.write(f"{feature},{confidence}'\n'")
+      f.write(f"{feature},{confidence}\n")
     f.close()
     
     print('Extracted software requirements --> '+opt.output_file)
