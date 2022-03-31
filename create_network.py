@@ -1,7 +1,10 @@
 import nltk 
+nltk.download('stopwords')
+
 import random
 import numpy as np
 import networkx as nx
+import argparse
 
 APPS = ['eBay', 'WhatsApp', 'Facebook', 'Evernote', 'Twitter', 'Netflix', 'PhotoEditor', 'Spotify']
                 
@@ -12,7 +15,7 @@ def get_sequence_to_token(lines, TOKEN='$T$'):
         token = lines[line_idx + 1].strip()
         iob_class = int(lines[line_idx + 2])
 
-        full_sentence = sentence.replace(TOKEN, token)
+        full_sentence = sentence.replace(TOKEN, token).lower()
 
         if full_sentence in sequence_to_tokens:
             sequence_to_tokens[full_sentence].append((token, iob_class))
@@ -23,18 +26,18 @@ def get_sequence_to_token(lines, TOKEN='$T$'):
 
 def negative_sampling(Graph, sequence_to_tokens, n_positive_req):
     negatives = []
+    stop_words = nltk.corpus.stopwords.words('english')
     for sentence, tokens_info in sequence_to_tokens.items():
         for token, iob_class in tokens_info:
-            if iob_class == -1:
+            if iob_class == -1 and token not in stop_words:
                 negatives.append((token, sentence))
-    
+
     ns = random.sample(negatives, n_positive_req)
     for token, sentence in ns:
         Graph.add_node(token, iob_class=-1)
         Graph.add_edge(sentence, token)
 
-def populate_train_layer(Graph, app_name, file_path='./dataset_train',):
-    if app_name not in APPS: return None
+def populate_train_data(Graph, app_name, file_path='./dataset_train',):
     TOKEN = "$T$"
 
     lines = []
@@ -54,7 +57,7 @@ def populate_train_layer(Graph, app_name, file_path='./dataset_train',):
     
     negative_sampling(Graph, sequence_to_tokens, positive_req)
 
-def populate_test_layer(Graph, path_test, app_name, path_model_pred):
+def populate_test_layer(Graph, app_name, path_test, path_model_pred):
     APPS.remove(app_name)
     
     for app in APPS:
@@ -66,20 +69,30 @@ def populate_test_layer(Graph, path_test, app_name, path_model_pred):
 
             extracted_requirements = [req.strip() for req in extracted_data.split(',')[0].split(';')]
             Graph.add_nodes_from(extracted_requirements, iob_class=1)
-            for req in extracted_requirements: Graph.add_edge(sentence.strip(), req)
+            for req in extracted_requirements: Graph.add_edge(sentence.strip().lower(), req)
     
     APPS.append(app_name)
 
-def create_graph(train_file_path, test_file_path, model_pred_path, app_name):
+def create_graph(opt):
     G = nx.Graph()
-    # Create train dataset layer (upper layers nodes) + negative sampling
-    populate_train_layer(G, app_name, train_file_path)
+    # Create train dataset layer + negative sampling
+    populate_train_data(G, opt.dataset, opt.train_folder)
 
     # Create test dataset layer
-    populate_test_layer(G, test_file_path, app_name, model_pred_path)
+    populate_test_layer(G, opt.dataset, opt.test_folder, opt.models_pred_folder)
 
 def main():
-    create_graph('./dataset_train', './datasets_iob' , './models_predictions')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_folder', default='./dataset_train', type=str)
+    parser.add_argument('--test_folder', default='./datasets_iob', type=str)
+    parser.add_argument('--models_pred_folder', default='./models_predictions', type=str)
+
+    # To be changed
+    parser.add_argument('--dataset', type=str, help='app_name')
+
+    opt = parser.parse_args()
+
+    create_graph(opt)
 
 if __name__ == '__main__':
     main()
