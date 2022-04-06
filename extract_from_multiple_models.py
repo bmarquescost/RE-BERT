@@ -134,7 +134,8 @@ def main():
     parser.add_argument('--classifier_model_file', type=str)
     
     parser.add_argument('--model_trained_on', type=str)
-    
+    parser.add_argument('--test_data_path', type=str)
+
     # parser.add_argument('--output_file', type=str)
     # parser.add_argument('--datasets', default='evernote', type=str, help='app_name')
     parser.add_argument('--test_file', type=str)
@@ -201,7 +202,7 @@ def main():
     for app in apps:
         if app in opt.model_name: continue 
         print(f"Extracting software requirements from {app} dataset")
-        f_in = open(f"test_data_{app}.txt", 'r')
+        f_in = open(f"{opt.test_data_path}/test_data_{app}.txt", 'r')
         test_data = f_in.readlines()
         f_in.close()
 

@@ -206,7 +206,9 @@ def main():
     
     confidences = []
     features_extracted = []
-    
+
+    tokens_IB = set()
+
     for predict in predict_data:
         featu= []
         confu= []
@@ -220,9 +222,9 @@ def main():
           iob=p[1]['iob']
           confidence = p[1]['confidences'][np.argmax(p[1]['confidences'])]
 
-
           if iob!=-1 and iobAnt==-1:
             featu.append(token)
+            tokens_IB.add(token)
             confu.append(confidence)
 
           elif iob!=-1 and iobAnt!=-1:
@@ -235,6 +237,10 @@ def main():
 
         features_extracted.append((';'.join(featu)))
         confidences.append(';'.join([str(i) for i in confu]))
+
+    negative_sampling = []
+
+
 
     f = open(opt.output_file, "w")
     for feature, confidence in zip(features_extracted, confidences):
