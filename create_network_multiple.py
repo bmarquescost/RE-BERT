@@ -2,25 +2,42 @@ from socket import create_connection
 import nltk 
 nltk.download('stopwords')
 
+from tqdm import tqdm
+
 import random
 import numpy as np
 import networkx as nx
 import argparse
+import re
+
+import pickle
 
 APPS = ['eBay', 'WhatsApp', 'Facebook', 'Evernote', 'Twitter', 'Netflix', 'PhotoEditor', 'Spotify']
                 
-def get_sequence_to_token(sequence_to_tokens, lines, TOKEN='$T$'):
+def get_sequence_to_token(sequence_to_tokens, lines, TOKEN='$t$'):
+    curr_sentence = None
+    same_sentence_word_set = {}
     for line_idx in range(0, len(lines), 3):
         sentence = lines[line_idx].strip().lower()
-        token = lines[line_idx + 1].strip().lower()
-        iob_class = int(lines[line_idx + 2])
-
         full_sentence = sentence.replace(TOKEN, token).lower()
+        
+        if line_idx == 0 or curr_sentence == full_sentence:
+            same_sentence_word_set[ (lines[line_idx + 1].strip().lower(), sentence.find(TOKEN)) ] = int(lines[line_idx + 2]
+            
+            
+        if full_sentence != curr_sentence:
+            curr_sentence = full_sentence
 
-        if full_sentence in sequence_to_tokens:
-            sequence_to_tokens[full_sentence].append((token, iob_class))
-        else:
-            sequence_to_tokens[full_sentence] = [(token, iob_class)]
+            valid_tokens = {}
+            for (token, index), iob_class in same_sentence_word_set.items():
+                split_tokens = token.split(' ') # Checking for multiple words requirements
+                for tok in split_tokens.keys():
+                    
+
+            if full_sentence in sequence_to_tokens:
+                sequence_to_tokens[full_sentence].append((token, iob_class))
+            else:
+                sequence_to_tokens[full_sentence] = [(token, iob_class)]
     
 
 def negative_sampling(Graph, sequence_to_tokens, n_positive_req):
@@ -33,11 +50,12 @@ def negative_sampling(Graph, sequence_to_tokens, n_positive_req):
 
     ns = random.sample(negatives, n_positive_req)
     for token, sentence in ns:
+        if token == '': print(f'OU TEM UM AQUI!!!! {token} {sentence}')
         Graph.add_node(token, iob_class=-1)
         Graph.add_edge(sentence, token)
 
 def populate_train_data(Graph, file_path='./dataset_train',):
-    TOKEN = "$T$"
+    TOKEN = "$t$"
 
     sequence_to_tokens = {}
     for app in APPS:
@@ -59,14 +77,11 @@ def populate_train_data(Graph, file_path='./dataset_train',):
     negative_sampling(Graph, sequence_to_tokens, positive_req)
 
 def populate_test_layer(Graph, path_test, path_model_pred):
-    for model_app in APPS:
-        print(APPS)
+    for model_app in tqdm(APPS):
         APPS.remove(model_app)
         Graph.add_node(model_app)
         
         for app in APPS:
-            print(f"Modelo: {path_model_pred}/{model_app}/{model_app}_model_on_{app}.txt")
-            print(f"{path_test}/test_data_{app}.txt")
             with open(f"{path_model_pred}/{model_app}/{model_app}_model_on_{app}.txt") as model_pred_fp, open(f"{path_test}/test_data_{app}.txt") as test_fp:
                 test_sentences = test_fp.readlines()    
                 model_preds    = model_pred_fp.readlines()
@@ -75,13 +90,11 @@ def populate_test_layer(Graph, path_test, path_model_pred):
                 Graph.add_node(sentence.strip().lower())
                 tmp = extracted_data.split(',')[0].split(';')
                 extracted_requirements = [req.strip().lower() for req in tmp]
-                # Graph.add_nodes_from(extracted_requirements, iob_class=1)
-                # print(f"{sentence.strip()}: {extracted_requirements}")
-                for req in extracted_requirements:
-                    # print(req)
-                    Graph.add_node(req, iob_class = 1)
-                    Graph.add_edge(sentence.strip().lower(), req)
-                    Graph.add_edge(model_app, req)
+                if not (extracted_requirements[0] == '' and len(extracted_requirements) == 1):
+                    for req in extracted_requirements:
+                        Graph.add_node(req, iob_class = 1)
+                        Graph.add_edge(sentence.strip().lower(), req)
+                        Graph.add_edge(model_app, req)
         APPS.insert(0, model_app)
 
 def create_graph(opt):
@@ -99,11 +112,21 @@ def main():
     parser.add_argument('--train_folder', default='./dataset_train', type=str)
     parser.add_argument('--test_folder', default='./datasets_iob', type=str)
     parser.add_argument('--models_pred_folder', default='./models_predictions', type=str)
-
+    parser.add_argument('--dump_graph_path', default='./multiple_models_graph.p')
     opt = parser.parse_args()
 
     graph = create_graph(opt)
+
+    with open(opt.dump_graph_path, 'wb') as f:
+        pickle.dump(graph, f) 
     
-    
+    g = None
+    with open(opt.dump_graph_path, 'rb') as f:
+        g = pickle.load(f)
+
+
+    for e in g.edges():
+        print(e)
+
 if __name__ == '__main__':
     main()
